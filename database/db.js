@@ -1,8 +1,25 @@
 const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
+const { createClient } = require('@supabase/supabase-js');
 
-const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'database.sqlite');
-const db = new sqlite3.Database(dbPath);
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const usesSupabase = Boolean(supabaseUrl && supabaseServiceRoleKey);
+
+let db = null;
+let supabase = null;
+
+if (usesSupabase) {
+  supabase = createClient(supabaseUrl, supabaseServiceRoleKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
+} else {
+  const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '..', 'database.sqlite');
+  db = new sqlite3.Database(dbPath);
+}
 
 function run(sql, params = []) {
   return new Promise((resolve, reject) => {
@@ -31,7 +48,21 @@ function all(sql, params = []) {
   });
 }
 
-async function initDatabase() {
+function normalizeHint(row) {
+  return {
+    ...row,
+    favorite: row.favorite === true || row.favorite === 1
+  };
+}
+
+function handleSupabaseResult(result) {
+  if (result.error) {
+    throw result.error;
+  }
+  return result.data;
+}
+
+async function initSqliteDatabase() {
   await run(`
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,10 +89,196 @@ async function initDatabase() {
   `);
 }
 
+async function initSupabaseDatabase() {
+  const result = await supabase.from('users').select('id').limit(1);
+  if (result.error) {
+    throw new Error(
+      `Supabase tables are not ready: ${result.error.message}. Run supabase-schema.sql in the Supabase SQL editor.`
+    );
+  }
+}
+
+async function initDatabase() {
+  if (usesSupabase) {
+    await initSupabaseDatabase();
+    return;
+  }
+
+  await initSqliteDatabase();
+}
+
+async function findUserByUsername(username) {
+  if (usesSupabase) {
+    const data = handleSupabaseResult(
+      await supabase
+        .from('users')
+        .select('id, username, password_hash')
+        .eq('username', username)
+        .maybeSingle()
+    );
+    return data;
+  }
+
+  return get('SELECT id, username, password_hash FROM users WHERE username = ?', [username]);
+}
+
+async function createUser(username, passwordHash) {
+  if (usesSupabase) {
+    const data = handleSupabaseResult(
+      await supabase
+        .from('users')
+        .insert({ username, password_hash: passwordHash })
+        .select('id, username')
+        .single()
+    );
+    return data;
+  }
+
+  const result = await run('INSERT INTO users (username, password_hash) VALUES (?, ?)', [
+    username,
+    passwordHash
+  ]);
+  return { id: result.id, username };
+}
+
+async function listHints(userId, search = '') {
+  if (usesSupabase) {
+    const data = handleSupabaseResult(
+      await supabase
+        .from('hints')
+        .select('id, site, category, encrypted_hint, iv, auth_tag, favorite, created_at, updated_at')
+        .eq('user_id', userId)
+        .ilike('site', `%${search}%`)
+        .order('favorite', { ascending: false })
+        .order('updated_at', { ascending: false })
+    );
+    return data.map(normalizeHint);
+  }
+
+  const rows = await all(
+    `SELECT id, site, category, encrypted_hint, iv, auth_tag, favorite, created_at, updated_at
+     FROM hints
+     WHERE user_id = ? AND site LIKE ?
+     ORDER BY favorite DESC, updated_at DESC`,
+    [userId, `%${search}%`]
+  );
+  return rows.map(normalizeHint);
+}
+
+async function createHint(userId, { site, category, encryptedHint, iv, authTag }) {
+  if (usesSupabase) {
+    const data = handleSupabaseResult(
+      await supabase
+        .from('hints')
+        .insert({
+          user_id: userId,
+          site,
+          category,
+          encrypted_hint: encryptedHint,
+          iv,
+          auth_tag: authTag
+        })
+        .select('id')
+        .single()
+    );
+    return data;
+  }
+
+  const result = await run(
+    `INSERT INTO hints (user_id, site, category, encrypted_hint, iv, auth_tag)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [userId, site, category, encryptedHint, iv, authTag]
+  );
+  return { id: result.id };
+}
+
+async function findHintByIdForUser(id, userId) {
+  if (usesSupabase) {
+    const data = handleSupabaseResult(
+      await supabase
+        .from('hints')
+        .select('id')
+        .eq('id', id)
+        .eq('user_id', userId)
+        .maybeSingle()
+    );
+    return data;
+  }
+
+  return get('SELECT id FROM hints WHERE id = ? AND user_id = ?', [id, userId]);
+}
+
+async function updateHint(id, userId, { site, category, encryptedHint, iv, authTag }) {
+  if (usesSupabase) {
+    handleSupabaseResult(
+      await supabase
+        .from('hints')
+        .update({
+          site,
+          category,
+          encrypted_hint: encryptedHint,
+          iv,
+          auth_tag: authTag,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id)
+        .eq('user_id', userId)
+    );
+    return;
+  }
+
+  await run(
+    `UPDATE hints
+     SET site = ?, category = ?, encrypted_hint = ?, iv = ?, auth_tag = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ? AND user_id = ?`,
+    [site, category, encryptedHint, iv, authTag, id, userId]
+  );
+}
+
+async function setHintFavorite(id, userId, favorite) {
+  if (usesSupabase) {
+    handleSupabaseResult(
+      await supabase
+        .from('hints')
+        .update({ favorite, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .eq('user_id', userId)
+    );
+    return;
+  }
+
+  await run(
+    'UPDATE hints SET favorite = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
+    [favorite ? 1 : 0, id, userId]
+  );
+}
+
+async function deleteHint(id, userId) {
+  if (usesSupabase) {
+    handleSupabaseResult(
+      await supabase
+        .from('hints')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', userId)
+    );
+    return;
+  }
+
+  await run('DELETE FROM hints WHERE id = ? AND user_id = ?', [id, userId]);
+}
+
 module.exports = {
   db,
-  run,
-  get,
-  all,
-  initDatabase
+  supabase,
+  usesSupabase,
+  initDatabase,
+  findUserByUsername,
+  createUser,
+  listHints,
+  createHint,
+  findHintByIdForUser,
+  updateHint,
+  setHintFavorite,
+  deleteHint
 };

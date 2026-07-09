@@ -1,7 +1,14 @@
 const crypto = require('crypto');
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
-const { all, get, run } = require('../database/db');
+const {
+  createHint,
+  deleteHint,
+  findHintByIdForUser,
+  listHints,
+  setHintFavorite,
+  updateHint
+} = require('../database/db');
 
 const router = express.Router();
 
@@ -32,14 +39,7 @@ function decryptHint(row) {
 router.use(requireAuth);
 
 router.get('/', async (req, res) => {
-  const search = `%${req.query.search || ''}%`;
-  const rows = await all(
-    `SELECT id, site, category, encrypted_hint, iv, auth_tag, favorite, created_at, updated_at
-     FROM hints
-     WHERE user_id = ? AND site LIKE ?
-     ORDER BY favorite DESC, updated_at DESC`,
-    [req.user.id, search]
-  );
+  const rows = await listHints(req.user.id, req.query.search || '');
 
   res.json(rows.map((row) => ({
     id: row.id,
@@ -60,42 +60,47 @@ router.post('/', async (req, res) => {
   }
 
   const encrypted = encryptHint(hint);
-  const result = await run(
-    `INSERT INTO hints (user_id, site, category, encrypted_hint, iv, auth_tag)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [req.user.id, site, category, encrypted.encryptedHint, encrypted.iv, encrypted.authTag]
-  );
+  const result = await createHint(req.user.id, {
+    site,
+    category,
+    encryptedHint: encrypted.encryptedHint,
+    iv: encrypted.iv,
+    authTag: encrypted.authTag
+  });
 
   return res.status(201).json({ id: result.id, message: '힌트가 암호화되어 저장되었습니다.' });
 });
 
 router.put('/:id', async (req, res) => {
-  const row = await get('SELECT id FROM hints WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
-  if (!row) return res.status(404).json({ message: '힌트를 찾을 수 없습니다.' });
+  const row = await findHintByIdForUser(req.params.id, req.user.id);
+  if (!row) {
+    return res.status(404).json({ message: '힌트를 찾을 수 없습니다.' });
+  }
 
   const { site, hint, category = '기타' } = req.body;
+  if (!site || !hint) {
+    return res.status(400).json({ message: '사이트와 힌트를 입력해 주세요.' });
+  }
+
   const encrypted = encryptHint(hint);
-  await run(
-    `UPDATE hints
-     SET site = ?, category = ?, encrypted_hint = ?, iv = ?, auth_tag = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE id = ? AND user_id = ?`,
-    [site, category, encrypted.encryptedHint, encrypted.iv, encrypted.authTag, req.params.id, req.user.id]
-  );
+  await updateHint(req.params.id, req.user.id, {
+    site,
+    category,
+    encryptedHint: encrypted.encryptedHint,
+    iv: encrypted.iv,
+    authTag: encrypted.authTag
+  });
 
   return res.json({ message: '힌트가 수정되었습니다.' });
 });
 
 router.patch('/:id/favorite', async (req, res) => {
-  const favorite = req.body.favorite ? 1 : 0;
-  await run(
-    'UPDATE hints SET favorite = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?',
-    [favorite, req.params.id, req.user.id]
-  );
+  await setHintFavorite(req.params.id, req.user.id, Boolean(req.body.favorite));
   res.json({ message: '즐겨찾기가 변경되었습니다.' });
 });
 
 router.delete('/:id', async (req, res) => {
-  await run('DELETE FROM hints WHERE id = ? AND user_id = ?', [req.params.id, req.user.id]);
+  await deleteHint(req.params.id, req.user.id);
   res.json({ message: '힌트가 삭제되었습니다.' });
 });
 

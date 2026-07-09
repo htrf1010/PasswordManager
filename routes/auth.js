@@ -1,7 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { get, run } = require('../database/db');
+const { createUser, findUserByUsername } = require('../database/db');
 
 const router = express.Router();
 
@@ -32,18 +32,14 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: '비밀번호 확인이 일치하지 않습니다.' });
   }
 
-  const exists = await get('SELECT id FROM users WHERE username = ?', [username]);
+  const exists = await findUserByUsername(username);
   if (exists) {
     return res.status(409).json({ message: '이미 사용 중인 아이디입니다.' });
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const result = await run('INSERT INTO users (username, password_hash) VALUES (?, ?)', [
-    username,
-    passwordHash
-  ]);
+  const user = await createUser(username, passwordHash);
 
-  const user = { id: result.id, username };
   return res.status(201).json({ token: createToken(user), user });
 });
 
@@ -54,7 +50,7 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ message: '아이디와 비밀번호를 입력해 주세요.' });
   }
 
-  const user = await get('SELECT id, username, password_hash FROM users WHERE username = ?', [username]);
+  const user = await findUserByUsername(username);
   if (!user) {
     return res.status(401).json({ message: '아이디 또는 비밀번호가 올바르지 않습니다.' });
   }
