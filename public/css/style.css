@@ -1,3 +1,6 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800;900&display=swap");
+
 :root {
   color-scheme: dark;
   --bg: #091413;
@@ -28,7 +31,7 @@ body {
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, "Noto Sans KR", sans-serif;
+  font-family: "Pretendard", "Noto Sans KR", Arial, sans-serif;
 }
 
 button,
@@ -118,6 +121,7 @@ h2 {
   margin: 0 0 38px;
   text-align: center;
   color: #ffffff;
+  font-family: "Orbitron", "Pretendard", sans-serif;
   font-size: clamp(56px, 7vw, 78px);
   font-weight: 900;
   line-height: 1.12;
@@ -161,6 +165,7 @@ h2 {
 
 .main-nav a {
   color: var(--text);
+  font-weight: 700;
   font-size: clamp(18px, 2vw, 27px);
   text-decoration: none;
   white-space: nowrap;
@@ -230,14 +235,15 @@ h2 {
   height: min(58%, 178px);
   fill: none;
   stroke: var(--ink);
-  stroke-width: 9;
+  stroke-width: 7;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .feature-card strong {
   font-size: clamp(24px, 2.25vw, 31px);
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 0;
 }
 
 .tool-grid {
