@@ -103,6 +103,52 @@ database.sqlite
 
 이 파일에는 회원 정보와 암호화된 힌트가 저장됩니다.
 
+## 간단 배포(Render)
+
+이 프로젝트는 Node.js Express 서버이므로 Render Web Service로 간단히 배포할 수 있습니다.
+
+### 1. GitHub에 최신 코드 push
+
+```powershell
+git add .
+git commit -m "Prepare Render deployment"
+git push origin main
+```
+
+### 2. Render에서 Web Service 생성
+
+1. Render에 로그인합니다.
+2. `New +` 버튼을 누릅니다.
+3. `Web Service`를 선택합니다.
+4. GitHub 저장소 `PasswordManager`를 연결합니다.
+5. 아래 설정을 확인합니다.
+
+```text
+Environment: Node
+Build Command: npm install
+Start Command: npm start
+```
+
+이 저장소에는 `render.yaml` 파일이 포함되어 있어 Blueprint 방식으로도 배포할 수 있습니다.
+
+### 3. 환경변수
+
+Render 환경변수에 아래 값이 필요합니다.
+
+```env
+JWT_SECRET=긴_랜덤_문자열
+ENCRYPTION_KEY=긴_랜덤_문자열
+```
+
+`render.yaml`을 사용하면 Render가 두 값을 자동 생성하도록 설정되어 있습니다.
+
+### 4. SQLite 배포 주의
+
+간단 배포에서는 SQLite 파일이 서버 파일 시스템에 생성됩니다.
+무료 배포 환경에서는 재배포/재시작 시 데이터가 유지되지 않을 수 있으므로, 발표용 링크나 기능 시연용으로 사용하는 것을 권장합니다.
+
+데이터를 안정적으로 유지하려면 Supabase/PostgreSQL 같은 외부 DB로 이전하는 것이 좋습니다.
+
 ## 발표 시 강조할 점
 
 - 단순 비밀번호 저장 프로그램이 아니라, 비밀번호를 직접 저장하지 않고 힌트만 암호화해 저장합니다.
