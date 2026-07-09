@@ -1,7 +1,7 @@
 {
   "name": "password-manager",
   "version": "1.0.0",
-  "description": "Dark theme password manager project with strength analysis, secure generation, encrypted hints, and GPT security advice.",
+  "description": "Dark theme password manager project with strength analysis, secure generation, and encrypted hints.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -12,7 +12,6 @@
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
-    "openai": "^4.77.0",
     "sqlite3": "^5.1.7"
   }
 }

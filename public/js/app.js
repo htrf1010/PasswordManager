@@ -372,8 +372,14 @@ async function init() {
   renderAuth();
   analyzeCurrentPassword();
   loadHints();
-  history.replaceState({ tool: null }, '', '#home');
-  showTool(null, false);
+  const initialTool = window.location.hash.replace('#', '');
+  if (toolIds.includes(initialTool)) {
+    history.replaceState({ tool: initialTool }, '', `#${initialTool}`);
+    showTool(initialTool, false);
+  } else {
+    history.replaceState({ tool: null }, '', '#home');
+    showTool(null, false);
+  }
 }
 
 $('#openLogin').addEventListener('click', () => openAuth('login'));

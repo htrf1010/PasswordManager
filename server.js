@@ -8,7 +8,6 @@ const { initDatabase } = require('./database/db');
 const authRoutes = require('./routes/auth');
 const passwordRoutes = require('./routes/password');
 const hintRoutes = require('./routes/hint');
-const aiRoutes = require('./routes/ai');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -19,7 +18,6 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/api/auth', authRoutes);
 app.use('/api/password', passwordRoutes);
 app.use('/api/hints', hintRoutes);
-app.use('/api/ai', aiRoutes);
 
 app.get('/health', (req, res) => {
   res.json({ ok: true });
