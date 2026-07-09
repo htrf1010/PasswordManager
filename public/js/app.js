@@ -4,10 +4,12 @@ const state = {
   rules: {},
   analysis: null,
   authMode: 'login',
-  editingHintId: null
+  editingHintId: null,
+  activeTool: null
 };
 
 const $ = (selector) => document.querySelector(selector);
+const toolIds = ['analyzer', 'generator', 'hints'];
 
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
@@ -35,6 +37,7 @@ function clearAuth() {
   localStorage.removeItem('pm_token');
   renderAuth();
   $('#hintList').innerHTML = '<p class="muted">로그인하면 암호화된 힌트를 저장하고 조회할 수 있습니다.</p>';
+  showTool(null);
 }
 
 function renderAuth() {
@@ -81,12 +84,35 @@ function populateSites() {
   $('#analysisSite').value = 'Google';
   $('#generatorSite').value = 'Google';
   renderRule();
+  applyGeneratorRule();
 }
 
-function renderRule() {
-  const site = $('#analysisSite').value || $('#generatorSite').value || 'Default';
-  const rule = state.rules[site] || state.rules.Default;
-  $('#ruleBox').innerHTML = `
+function getRule(site) {
+  return state.rules[site] || state.rules.Default;
+}
+
+function getAllowedSpecialText(rule) {
+  if (rule.allowSpecial === false) return '허용 안 됨';
+
+  const rawRules = rule.rawRules || '';
+  const bracketGroups = [...rawRules.matchAll(/\[([^\]]+)\]/g)]
+    .map((match) => match[1])
+    .filter((value) => /[^A-Za-z0-9,\s]/.test(value));
+
+  if (bracketGroups.length) {
+    const specials = [...new Set(bracketGroups.join('').replace(/[A-Za-z0-9,\s]/g, '').split(''))];
+    return specials.length ? specials.join(' ') : '사이트 규칙 내 특수문자 허용';
+  }
+
+  if (/special|ascii-printable|unicode/i.test(rawRules)) {
+    return '! @ # $ % ^ & * ?';
+  }
+
+  return '! @ # $ % ^ & * ?';
+}
+
+function formatRule(rule) {
+  return `
     <strong>${rule.name}</strong><br>
     최소 길이: ${rule.minLength}자<br>
     최대 길이: ${rule.maxLength || '제한 없음'}<br>
@@ -94,8 +120,66 @@ function renderRule() {
     소문자 필수: ${rule.requireLowercase ? '예' : '아니오'}<br>
     숫자 필수: ${rule.requireNumber ? '예' : '아니오'}<br>
     특수문자 필수: ${rule.requireSpecial ? '예' : '아니오'}<br>
-    <span>원본 규칙: ${rule.rawRules || '기본 규칙'}</span>
+    <span>허용 특수문자: ${getAllowedSpecialText(rule)}</span>
   `;
+}
+
+function renderRule() {
+  $('#ruleBox').innerHTML = formatRule(getRule($('#analysisSite').value || 'Default'));
+}
+
+function applyRequiredOption(input, required, allowed = true) {
+  input.checked = required || (allowed && input.checked);
+  input.disabled = required || !allowed;
+}
+
+function applyGeneratorRule() {
+  const rule = getRule($('#generatorSite').value || 'Default');
+  const lengthInput = $('#lengthInput');
+  lengthInput.min = rule.minLength;
+  lengthInput.max = rule.maxLength || 64;
+
+  const currentLength = Number(lengthInput.value) || rule.minLength;
+  const maxLength = Number(lengthInput.max);
+  lengthInput.value = Math.min(Math.max(currentLength, rule.minLength), maxLength);
+
+  applyRequiredOption($('#upperOption'), Boolean(rule.requireUppercase));
+  applyRequiredOption($('#lowerOption'), Boolean(rule.requireLowercase));
+  applyRequiredOption($('#numberOption'), Boolean(rule.requireNumber));
+  applyRequiredOption($('#specialOption'), Boolean(rule.requireSpecial), rule.allowSpecial !== false);
+  $('#generatorRuleBox').innerHTML = formatRule(rule);
+}
+
+function showTool(toolId, shouldPushState = true) {
+  state.activeTool = toolIds.includes(toolId) ? toolId : null;
+  $('#home').classList.toggle('is-hidden', Boolean(state.activeTool));
+  for (const id of toolIds) {
+    $(`#${id}`).classList.toggle('is-active', id === state.activeTool);
+  }
+
+  if (!state.activeTool) {
+    if (shouldPushState) history.pushState({ tool: null }, '', '#home');
+    return;
+  }
+
+  if (shouldPushState) history.pushState({ tool: state.activeTool }, '', `#${state.activeTool}`);
+}
+
+function handleNavigation(event) {
+  const link = event.target.closest('a[href^="#"]');
+  if (!link) return;
+
+  const target = link.getAttribute('href').slice(1);
+  if (target === 'home') {
+    event.preventDefault();
+    showTool(null);
+    return;
+  }
+
+  if (toolIds.includes(target)) {
+    event.preventDefault();
+    showTool(target);
+  }
 }
 
 function meterColor(score) {
@@ -148,6 +232,7 @@ async function analyzeCurrentPassword() {
 }
 
 async function generatePassword() {
+  applyGeneratorRule();
   const data = await api('/api/password/generate', {
     method: 'POST',
     body: JSON.stringify({
@@ -180,38 +265,6 @@ async function copyGeneratedPassword() {
       $('#copyMessage').textContent = '브라우저 정책상 클립보드 자동 초기화가 제한되었습니다.';
     }
   }, 30000);
-}
-
-async function requestAiAdvice() {
-  if (!state.token) {
-    $('#aiAdviceBox').textContent = 'AI 보안 조언은 로그인 후 사용할 수 있습니다.';
-    return;
-  }
-  if (!state.analysis || !$('#passwordInput').value) {
-    $('#aiAdviceBox').textContent = '먼저 분석할 비밀번호를 입력해 주세요.';
-    return;
-  }
-
-  $('#aiAdviceBox').textContent = 'AI가 보안 조언을 작성하는 중입니다...';
-  try {
-    const data = await api('/api/ai/advice', {
-      method: 'POST',
-      body: JSON.stringify({
-        password: $('#passwordInput').value,
-        site: $('#analysisSite').value,
-        score: state.analysis.score,
-        label: state.analysis.label,
-        ruleAdvice: state.analysis.advice
-      })
-    });
-    if (Array.isArray(data.advice)) {
-      $('#aiAdviceBox').innerHTML = `<ul>${data.advice.map((item) => `<li>${item}</li>`).join('')}</ul>`;
-    } else {
-      $('#aiAdviceBox').textContent = data.advice;
-    }
-  } catch (error) {
-    $('#aiAdviceBox').textContent = error.message;
-  }
 }
 
 async function saveHint() {
@@ -258,7 +311,6 @@ function renderHints(hints) {
         <span>${hint.category}</span>
       </header>
       <p>${hint.hint}</p>
-      <p>DB 저장 형태: ${hint.encryptedPreview}</p>
       <div class="hint-actions">
         <button class="small-button" data-action="favorite" data-id="${hint.id}" data-value="${!hint.favorite}">
           ${hint.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
@@ -320,6 +372,8 @@ async function init() {
   renderAuth();
   analyzeCurrentPassword();
   loadHints();
+  history.replaceState({ tool: null }, '', '#home');
+  showTool(null, false);
 }
 
 $('#openLogin').addEventListener('click', () => openAuth('login'));
@@ -332,13 +386,17 @@ $('#analysisSite').addEventListener('change', () => {
   renderRule();
   analyzeCurrentPassword();
 });
-$('#generatorSite').addEventListener('change', renderRule);
+$('#generatorSite').addEventListener('change', applyGeneratorRule);
 $('#generateButton').addEventListener('click', generatePassword);
 $('#copyButton').addEventListener('click', copyGeneratedPassword);
-$('#aiAdviceButton').addEventListener('click', requestAiAdvice);
 $('#saveHintButton').addEventListener('click', saveHint);
 $('#hintSearch').addEventListener('input', loadHints);
 $('#hintList').addEventListener('click', handleHintAction);
+document.addEventListener('click', handleNavigation);
+window.addEventListener('popstate', () => {
+  const tool = window.location.hash.replace('#', '');
+  showTool(toolIds.includes(tool) ? tool : null, false);
+});
 
 init().catch((error) => {
   document.body.insertAdjacentHTML('afterbegin', `<p class="muted">${error.message}</p>`);

@@ -76,6 +76,20 @@ function randomChar(chars) {
   return chars[crypto.randomInt(0, chars.length)];
 }
 
+function getAllowedSpecialChars(siteRule) {
+  if (siteRule.allowSpecial === false) return '';
+
+  const rawRules = siteRule.rawRules || '';
+  const matches = [...rawRules.matchAll(/\[([^\]]+)\]/g)]
+    .map((match) => match[1])
+    .filter((value) => /[^A-Za-z0-9,\s]/.test(value));
+
+  if (!matches.length) return '!@#$%^&*?';
+
+  const chars = [...new Set(matches.join('').replace(/[A-Za-z0-9,\s]/g, '').split(''))].join('');
+  return chars || '!@#$%^&*?';
+}
+
 function shuffle(value) {
   const items = value.split('');
   for (let i = items.length - 1; i > 0; i -= 1) {
@@ -92,7 +106,7 @@ function generatePassword(options = {}) {
     uppercase: 'ABCDEFGHJKLMNPQRSTUVWXYZ',
     lowercase: 'abcdefghijkmnopqrstuvwxyz',
     number: '23456789',
-    special: '!@#$%^&*?'
+    special: getAllowedSpecialChars(siteRule)
   };
 
   const enabled = [];
