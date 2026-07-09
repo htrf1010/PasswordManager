@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Password Manager</title>
+    <link rel="stylesheet" href="/css/style.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <a class="brand-mark" href="#home" aria-label="Password Manager home">
+        <svg viewBox="0 0 48 56" aria-hidden="true">
+          <path d="M24 3 43 10v15c0 13-8 23-19 28C13 48 5 38 5 25V10L24 3Z"></path>
+          <rect x="14" y="25" width="20" height="17" rx="3"></rect>
+          <path d="M18 25v-6a6 6 0 0 1 12 0v6"></path>
+          <circle cx="24" cy="34" r="2"></circle>
+        </svg>
+      </a>
+      <nav class="main-nav">
+        <a href="#analyzer">비밀번호 강도 분석기</a>
+        <a href="#hints">힌트 메모장</a>
+        <a href="#generator">랜덤 비밀번호 생성기</a>
+      </nav>
+      <nav class="top-actions">
+        <span id="userBadge" class="user-badge hidden"></span>
+        <button id="openLogin" class="ghost-button">로그인</button>
+        <button id="openRegister" class="primary-button">회원가입</button>
+        <button id="logoutButton" class="ghost-button hidden">로그아웃</button>
+      </nav>
+    </header>
+
+    <main class="shell">
+      <section id="home" class="hero-panel">
+        <h1><span>PASSWORD</span><span>MANAGER</span></h1>
+        <div class="feature-cards">
+          <a class="feature-card" href="#analyzer">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <circle cx="52" cy="52" r="35"></circle>
+              <path d="M78 78 106 106"></path>
+              <path d="M30 99 49 80"></path>
+            </svg>
+            <strong>비밀번호 강도 분석기</strong>
+            <span>바로가기↗</span>
+          </a>
+          <a class="feature-card" href="#hints">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <path d="M28 26h64l-2 66H30L28 26Z"></path>
+              <path d="M35 26c0-12 10-12 10 0M51 26c0-12 10-12 10 0M67 26c0-12 10-12 10 0M83 26c0-12 10-12 10 0"></path>
+              <path d="M35 58h50M35 72h42"></path>
+            </svg>
+            <strong>힌트 메모장</strong>
+            <span>바로가기↗</span>
+          </a>
+          <a class="feature-card" href="#generator">
+            <svg viewBox="0 0 120 120" aria-hidden="true">
+              <rect x="20" y="42" width="38" height="38" rx="8"></rect>
+              <rect x="62" y="24" width="38" height="38" rx="8"></rect>
+              <circle cx="32" cy="54" r="3"></circle>
+              <circle cx="46" cy="68" r="3"></circle>
+              <circle cx="74" cy="36" r="3"></circle>
+              <circle cx="88" cy="50" r="3"></circle>
+            </svg>
+            <strong>랜덤 비밀번호 생성기</strong>
+            <span>바로가기↗</span>
+          </a>
+        </div>
+      </section>
+
+      <section id="analyzer" class="tool-grid">
+        <div class="panel">
+          <div class="panel-title">
+            <p class="eyebrow">Analyzer</p>
+            <h2>비밀번호 강도 분석기</h2>
+          </div>
+          <label>사이트</label>
+          <select id="analysisSite"></select>
+          <label>비밀번호</label>
+          <input id="passwordInput" type="password" placeholder="분석할 비밀번호 입력">
+          <div class="meter">
+            <span id="meterFill"></span>
+          </div>
+          <div class="score-row">
+            <strong id="scoreText">0점</strong>
+            <span id="labelText">대기</span>
+          </div>
+          <ul id="checkList" class="check-list"></ul>
+          <button id="aiAdviceButton" class="primary-button full">AI 보안 조언 받기</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-title">
+            <p class="eyebrow">Rules</p>
+            <h2>사이트 규칙 및 분석 결과</h2>
+          </div>
+          <div id="ruleBox" class="rule-box"></div>
+          <div id="adviceBox" class="advice-box">비밀번호를 입력하면 규칙 기반 분석이 표시됩니다.</div>
+          <div id="aiAdviceBox" class="ai-box">로그인 후 GPT 보안 조언을 받을 수 있습니다.</div>
+        </div>
+      </section>
+
+      <section id="generator" class="tool-grid">
+        <div class="panel">
+          <div class="panel-title">
+            <p class="eyebrow">Generator</p>
+            <h2>랜덤 비밀번호 생성기</h2>
+          </div>
+          <label>사이트</label>
+          <select id="generatorSite"></select>
+          <label>길이</label>
+          <input id="lengthInput" type="number" min="8" max="64" value="16">
+          <div class="toggle-grid">
+            <label><input id="upperOption" type="checkbox" checked> 대문자</label>
+            <label><input id="lowerOption" type="checkbox" checked> 소문자</label>
+            <label><input id="numberOption" type="checkbox" checked> 숫자</label>
+            <label><input id="specialOption" type="checkbox" checked> 특수문자</label>
+          </div>
+          <button id="generateButton" class="primary-button full">생성</button>
+        </div>
+        <div class="panel result-panel">
+          <div class="panel-title">
+            <p class="eyebrow">Result</p>
+            <h2>생성 결과</h2>
+          </div>
+          <output id="generatedPassword" class="password-output">아직 생성된 비밀번호가 없습니다.</output>
+          <button id="copyButton" class="ghost-button full">복사</button>
+          <p id="copyMessage" class="muted"></p>
+        </div>
+      </section>
+
+      <section id="hints" class="tool-grid">
+        <div class="panel">
+          <div class="panel-title">
+            <p class="eyebrow">Encrypted Memo</p>
+            <h2>나만의 비밀번호 힌트 메모장</h2>
+          </div>
+          <label>사이트</label>
+          <input id="hintSite" type="text" placeholder="예: Google">
+          <label>카테고리</label>
+          <select id="hintCategory">
+            <option>금융</option>
+            <option>SNS</option>
+            <option>게임</option>
+            <option>학교</option>
+            <option>회사</option>
+            <option selected>기타</option>
+          </select>
+          <label>힌트</label>
+          <textarea id="hintText" rows="5" placeholder="비밀번호가 아니라 나만 알 수 있는 힌트만 저장하세요."></textarea>
+          <button id="saveHintButton" class="primary-button full">암호화 저장</button>
+          <p id="hintMessage" class="muted"></p>
+        </div>
+        <div class="panel">
+          <div class="panel-title">
+            <p class="eyebrow">Search</p>
+            <h2>저장된 힌트</h2>
+          </div>
+          <input id="hintSearch" type="search" placeholder="사이트 검색">
+          <div id="hintList" class="hint-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="authDialog">
+      <form id="authForm" method="dialog" class="auth-form">
+        <h2 id="authTitle">로그인</h2>
+        <input id="authUsername" type="text" placeholder="아이디" autocomplete="username">
+        <input id="authPassword" type="password" placeholder="비밀번호" autocomplete="current-password">
+        <input id="authConfirm" class="hidden" type="password" placeholder="비밀번호 확인">
+        <p id="authMessage" class="muted"></p>
+        <div class="dialog-actions">
+          <button id="closeAuth" type="button" class="ghost-button">취소</button>
+          <button type="submit" class="primary-button">확인</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/js/app.js"></script>
+  </body>
+</html>
