@@ -10,7 +10,7 @@
   --text: #eefbf5;
   --muted: #b0e4cc;
   --green: #b0e4cc;
-  --yellow: #b0e4cc;
+  --yellow: #f7c948;
   --red: #ff6a6a;
   --blue: #408a71;
   --ink: #091413;
@@ -164,11 +164,32 @@ h2 {
 }
 
 .main-nav a {
+  position: relative;
+  padding: 24px 0;
   color: var(--text);
   font-weight: 700;
   font-size: clamp(18px, 2vw, 27px);
   text-decoration: none;
   white-space: nowrap;
+}
+
+.main-nav a::after {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  height: 4px;
+  border-radius: 999px;
+  background: transparent;
+  content: "";
+}
+
+.main-nav a.is-active {
+  color: var(--mint);
+}
+
+.main-nav a.is-active::after {
+  background: var(--mint);
 }
 
 .ghost-button,
@@ -255,10 +276,20 @@ h2 {
   padding: 24px 0;
   overflow: auto;
   align-content: start;
+  opacity: 0;
+  transform: translateY(10px);
 }
 
 .tool-grid.is-active {
   display: grid;
+  animation: tool-enter 0.22s ease forwards;
+}
+
+@keyframes tool-enter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .panel {
@@ -339,8 +370,17 @@ textarea:focus {
   color: var(--muted);
 }
 
+.check-list .pass {
+  color: var(--mint);
+}
+
+.check-list .fail {
+  color: #ff9a9a;
+}
+
 .rule-box,
 .advice-box,
+.risk-box,
 .ai-box,
 .password-output,
 .hint-card {
@@ -351,11 +391,17 @@ textarea:focus {
 
 .rule-box,
 .advice-box,
+.risk-box,
 .ai-box {
   padding: 16px;
   margin-bottom: 14px;
   color: var(--muted);
   line-height: 1.7;
+}
+
+.risk-box {
+  border-color: rgba(247, 201, 72, 0.65);
+  color: #ffe7a3;
 }
 
 .ai-box {
@@ -372,6 +418,11 @@ textarea:focus {
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin: 15px 0;
+}
+
+.toggle-grid.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 10px;
 }
 
 .toggle-grid label {
@@ -399,6 +450,19 @@ textarea:focus {
   font-weight: 800;
 }
 
+.rule-form {
+  display: grid;
+  gap: 10px;
+}
+
+.rule-form input {
+  margin: 0;
+}
+
+.output-title {
+  margin-top: 24px;
+}
+
 .muted {
   color: var(--muted);
   line-height: 1.6;
@@ -408,6 +472,13 @@ textarea:focus {
   display: grid;
   gap: 12px;
   margin-top: 14px;
+}
+
+.inline-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .hint-card {
@@ -423,6 +494,16 @@ textarea:focus {
 
 .hint-card h3 {
   margin: 0;
+}
+
+.favorite-star {
+  display: inline-block;
+  margin-right: 6px;
+  color: rgba(176, 228, 204, 0.35);
+}
+
+.favorite-star.is-on {
+  color: var(--yellow);
 }
 
 .hint-card p {

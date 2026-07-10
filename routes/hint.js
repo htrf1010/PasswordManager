@@ -2,9 +2,11 @@ const crypto = require('crypto');
 const express = require('express');
 const { requireAuth } = require('../middleware/auth');
 const {
+  createCategory,
   createHint,
   deleteHint,
   findHintByIdForUser,
+  listCategories,
   listHints,
   setHintFavorite,
   updateHint
@@ -38,8 +40,23 @@ function decryptHint(row) {
 
 router.use(requireAuth);
 
+router.get('/categories', async (req, res) => {
+  const categories = await listCategories(req.user.id);
+  res.json(categories);
+});
+
+router.post('/categories', async (req, res) => {
+  const name = String(req.body.name || '').trim();
+  if (!name) {
+    return res.status(400).json({ message: '카테고리 이름을 입력해 주세요.' });
+  }
+
+  await createCategory(req.user.id, name);
+  res.status(201).json({ message: '카테고리가 추가되었습니다.', name });
+});
+
 router.get('/', async (req, res) => {
-  const rows = await listHints(req.user.id, req.query.search || '');
+  const rows = await listHints(req.user.id, req.query.search || '', req.query.category || '');
 
   res.json(rows.map((row) => ({
     id: row.id,
@@ -58,6 +75,8 @@ router.post('/', async (req, res) => {
   if (!site || !hint) {
     return res.status(400).json({ message: '사이트와 힌트를 입력해 주세요.' });
   }
+
+  await createCategory(req.user.id, category);
 
   const encrypted = encryptHint(hint);
   const result = await createHint(req.user.id, {
@@ -81,6 +100,8 @@ router.put('/:id', async (req, res) => {
   if (!site || !hint) {
     return res.status(400).json({ message: '사이트와 힌트를 입력해 주세요.' });
   }
+
+  await createCategory(req.user.id, category);
 
   const encrypted = encryptHint(hint);
   await updateHint(req.params.id, req.user.id, {

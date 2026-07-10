@@ -11,7 +11,7 @@ function requireAuth(req, res, next) {
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
     return next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({ message: '인증이 만료되었습니다. 다시 로그인해 주세요.' });
   }
 }

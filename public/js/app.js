@@ -1,7 +1,11 @@
+const DEFAULT_CATEGORIES = ['금융', 'SNS', '게임', '학업', '회사', '기타'];
+
 const state = {
   token: localStorage.getItem('pm_token'),
   user: JSON.parse(localStorage.getItem('pm_user') || 'null'),
   rules: {},
+  categories: [],
+  hints: [],
   analysis: null,
   authMode: 'login',
   editingHintId: null,
@@ -9,6 +13,7 @@ const state = {
 };
 
 const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
 const toolIds = ['analyzer', 'generator', 'hints'];
 
 async function api(path, options = {}) {
@@ -27,16 +32,18 @@ function setAuth(user, token) {
   localStorage.setItem('pm_user', JSON.stringify(user));
   localStorage.setItem('pm_token', token);
   renderAuth();
-  loadHints();
+  refreshAccountData();
 }
 
 function clearAuth() {
   state.user = null;
   state.token = null;
+  state.categories = [];
   localStorage.removeItem('pm_user');
   localStorage.removeItem('pm_token');
   renderAuth();
-  $('#hintList').innerHTML = '<p class="muted">로그인하면 암호화된 힌트를 저장하고 조회할 수 있습니다.</p>';
+  renderCategories();
+  renderHints([]);
   showTool(null);
 }
 
@@ -53,7 +60,9 @@ function openAuth(mode) {
   state.authMode = mode;
   $('#authTitle').textContent = mode === 'login' ? '로그인' : '회원가입';
   $('#authConfirm').classList.toggle('hidden', mode === 'login');
-  $('#authMessage').textContent = '';
+  $('#authMessage').textContent = mode === 'login'
+    ? '아이디와 비밀번호를 입력해 주세요.'
+    : '아이디는 영문, 숫자, 밑줄 3~20자로 입력해 주세요.';
   $('#authForm').reset();
   $('#authDialog').showModal();
 }
@@ -76,15 +85,9 @@ async function submitAuth(event) {
   }
 }
 
-function populateSites() {
-  const sites = Object.keys(state.rules);
-  for (const select of [$('#analysisSite'), $('#generatorSite')]) {
-    select.innerHTML = sites.map((site) => `<option value="${site}">${state.rules[site].name}</option>`).join('');
-  }
-  $('#analysisSite').value = 'Google';
-  $('#generatorSite').value = 'Google';
-  renderRule();
-  applyGeneratorRule();
+function getSiteValue(inputId) {
+  const value = $(inputId).value.trim();
+  return state.rules[value] ? value : value || 'Default';
 }
 
 function getRule(site) {
@@ -92,7 +95,8 @@ function getRule(site) {
 }
 
 function getAllowedSpecialText(rule) {
-  if (rule.allowSpecial === false) return '허용 안 됨';
+  if (rule.allowSpecial === false) return '없음';
+  if (rule.allowedSpecials) return [...rule.allowedSpecials].join(' ');
 
   const rawRules = rule.rawRules || '';
   const bracketGroups = [...rawRules.matchAll(/\[([^\]]+)\]/g)]
@@ -101,11 +105,7 @@ function getAllowedSpecialText(rule) {
 
   if (bracketGroups.length) {
     const specials = [...new Set(bracketGroups.join('').replace(/[A-Za-z0-9,\s]/g, '').split(''))];
-    return specials.length ? specials.join(' ') : '사이트 규칙 내 특수문자 허용';
-  }
-
-  if (/special|ascii-printable|unicode/i.test(rawRules)) {
-    return '! @ # $ % ^ & * ?';
+    return specials.length ? specials.join(' ') : '! @ # $ % ^ & * ?';
   }
 
   return '! @ # $ % ^ & * ?';
@@ -120,12 +120,24 @@ function formatRule(rule) {
     소문자 필수: ${rule.requireLowercase ? '예' : '아니오'}<br>
     숫자 필수: ${rule.requireNumber ? '예' : '아니오'}<br>
     특수문자 필수: ${rule.requireSpecial ? '예' : '아니오'}<br>
-    <span>허용 특수문자: ${getAllowedSpecialText(rule)}</span>
+    <span>가능한 특수문자: ${getAllowedSpecialText(rule)}</span>
   `;
 }
 
+function populateSites() {
+  const sites = Object.keys(state.rules);
+  $('#siteOptions').innerHTML = sites
+    .map((site) => `<option value="${site}">${state.rules[site].name}</option>`)
+    .join('');
+
+  if (!$('#analysisSiteSearch').value) $('#analysisSiteSearch').value = 'Google';
+  if (!$('#generatorSiteSearch').value) $('#generatorSiteSearch').value = 'Google';
+  renderRule();
+  applyGeneratorRule();
+}
+
 function renderRule() {
-  $('#ruleBox').innerHTML = formatRule(getRule($('#analysisSite').value || 'Default'));
+  $('#ruleBox').innerHTML = formatRule(getRule(getSiteValue('#analysisSiteSearch')));
 }
 
 function applyRequiredOption(input, required, allowed = true) {
@@ -134,7 +146,7 @@ function applyRequiredOption(input, required, allowed = true) {
 }
 
 function applyGeneratorRule() {
-  const rule = getRule($('#generatorSite').value || 'Default');
+  const rule = getRule(getSiteValue('#generatorSiteSearch'));
   const lengthInput = $('#lengthInput');
   lengthInput.min = rule.minLength;
   lengthInput.max = rule.maxLength || 64;
@@ -150,12 +162,19 @@ function applyGeneratorRule() {
   $('#generatorRuleBox').innerHTML = formatRule(rule);
 }
 
+function setActiveNav() {
+  $$('[data-nav]').forEach((link) => {
+    link.classList.toggle('is-active', link.dataset.nav === state.activeTool);
+  });
+}
+
 function showTool(toolId, shouldPushState = true) {
   state.activeTool = toolIds.includes(toolId) ? toolId : null;
   $('#home').classList.toggle('is-hidden', Boolean(state.activeTool));
   for (const id of toolIds) {
     $(`#${id}`).classList.toggle('is-active', id === state.activeTool);
   }
+  setActiveNav();
 
   if (!state.activeTool) {
     if (shouldPushState) history.pushState({ tool: null }, '', '#home');
@@ -205,21 +224,23 @@ function renderAnalysis(data) {
   ];
 
   $('#checkList').innerHTML = checkLabels
-    .map(([key, label]) => `<li>${data.checks[key] ? 'OK' : 'NO'} ${label}</li>`)
+    .map(([key, label]) => `<li class="${data.checks[key] ? 'pass' : 'fail'}">${data.checks[key] ? 'OK' : 'NO'} ${label}</li>`)
     .join('');
 
+  $('#riskBox').textContent = data.risk?.text || '근거 있는 위험도 정보가 없습니다.';
   $('#adviceBox').innerHTML = `<ul>${data.advice.map((item) => `<li>${item}</li>`).join('')}</ul>`;
 }
 
 async function analyzeCurrentPassword() {
   const password = $('#passwordInput').value;
-  const site = $('#analysisSite').value;
+  const site = getSiteValue('#analysisSiteSearch');
   if (!password) {
     renderAnalysis({
       score: 0,
       label: '대기',
       checks: { length: false, uppercase: false, lowercase: false, number: false, special: false },
-      advice: ['비밀번호를 입력하면 실시간 분석이 시작됩니다.']
+      advice: ['비밀번호를 입력하면 실시간 분석을 시작합니다.'],
+      risk: { text: '비밀번호를 입력하면 규칙 기반 위험도를 표시합니다.' }
     });
     return;
   }
@@ -233,21 +254,24 @@ async function analyzeCurrentPassword() {
 
 async function generatePassword() {
   applyGeneratorRule();
+  const site = getSiteValue('#generatorSiteSearch');
   const data = await api('/api/password/generate', {
     method: 'POST',
     body: JSON.stringify({
-      site: $('#generatorSite').value,
+      site,
       length: Number($('#lengthInput').value),
       uppercase: $('#upperOption').checked,
       lowercase: $('#lowerOption').checked,
       number: $('#numberOption').checked,
-      special: $('#specialOption').checked
+      special: $('#specialOption').checked,
+      requiredChars: $('#requiredCharsInput').value,
+      extraChars: $('#extraCharsInput').value
     })
   });
 
   $('#generatedPassword').textContent = data.password;
   $('#passwordInput').value = data.password;
-  $('#analysisSite').value = $('#generatorSite').value;
+  $('#analysisSiteSearch').value = site;
   renderRule();
   renderAnalysis(data.analysis);
 }
@@ -256,20 +280,68 @@ async function copyGeneratedPassword() {
   const value = $('#generatedPassword').textContent;
   if (!value || value.includes('아직')) return;
   await navigator.clipboard.writeText(value);
-  $('#copyMessage').textContent = '클립보드에 복사되었습니다. 30초 후 자동으로 비웁니다.';
+  $('#copyMessage').textContent = '클립보드에 복사했습니다. 30초 후 비우기를 시도합니다.';
   setTimeout(async () => {
     try {
       await navigator.clipboard.writeText('');
       $('#copyMessage').textContent = '클립보드를 비웠습니다.';
     } catch {
-      $('#copyMessage').textContent = '브라우저 정책상 클립보드 자동 초기화가 제한되었습니다.';
+      $('#copyMessage').textContent = '브라우저 정책상 클립보드 자동 비우기가 제한되었습니다.';
     }
   }, 30000);
 }
 
+function renderCategories() {
+  const categories = [...new Set([...DEFAULT_CATEGORIES, ...state.categories])];
+  $('#hintCategory').innerHTML = categories
+    .map((category) => `<option value="${category}">${category}</option>`)
+    .join('');
+  $('#hintCategoryFilter').innerHTML = [
+    '<option value="">전체 카테고리</option>',
+    ...categories.map((category) => `<option value="${category}">${category}</option>`)
+  ].join('');
+}
+
+async function loadCategories() {
+  if (!state.token) {
+    state.categories = [];
+    renderCategories();
+    return;
+  }
+
+  state.categories = await api('/api/hints/categories');
+  renderCategories();
+}
+
+async function addCategory() {
+  if (!state.token) {
+    $('#hintMessage').textContent = '로그인해야 카테고리를 저장할 수 있습니다.';
+    return;
+  }
+
+  const input = $('#newCategoryInput');
+  if (input.classList.contains('hidden')) {
+    input.classList.remove('hidden');
+    input.focus();
+    return;
+  }
+
+  const name = input.value.trim();
+  if (!name) return;
+  const data = await api('/api/hints/categories', {
+    method: 'POST',
+    body: JSON.stringify({ name })
+  });
+  $('#hintMessage').textContent = data.message;
+  input.value = '';
+  input.classList.add('hidden');
+  await loadCategories();
+  $('#hintCategory').value = name;
+}
+
 async function saveHint() {
   if (!state.token) {
-    $('#hintMessage').textContent = '로그인 후 힌트를 저장할 수 있습니다.';
+    $('#hintMessage').textContent = '로그인해야 힌트를 저장할 수 있습니다.';
     return;
   }
 
@@ -288,6 +360,7 @@ async function saveHint() {
     $('#saveHintButton').textContent = '암호화 저장';
     $('#hintSite').value = '';
     $('#hintText').value = '';
+    await loadCategories();
     loadHints();
   } catch (error) {
     $('#hintMessage').textContent = error.message;
@@ -307,7 +380,7 @@ function renderHints(hints) {
   $('#hintList').innerHTML = hints.map((hint) => `
     <article class="hint-card">
       <header>
-        <h3>${hint.favorite ? '★ ' : ''}${hint.site}</h3>
+        <h3><span class="favorite-star ${hint.favorite ? 'is-on' : ''}">★</span>${hint.site}</h3>
         <span>${hint.category}</span>
       </header>
       <p>${hint.hint}</p>
@@ -328,7 +401,9 @@ async function loadHints() {
     return;
   }
   try {
-    const hints = await api(`/api/hints?search=${encodeURIComponent($('#hintSearch').value)}`);
+    const search = encodeURIComponent($('#hintSearch').value);
+    const category = encodeURIComponent($('#hintCategoryFilter').value);
+    const hints = await api(`/api/hints?search=${search}&category=${category}`);
     state.hints = hints;
     renderHints(hints);
   } catch (error) {
@@ -366,20 +441,59 @@ async function handleHintAction(event) {
   loadHints();
 }
 
-async function init() {
+async function saveCustomRule() {
+  if (!state.token) {
+    $('#ruleMessage').textContent = '로그인해야 사이트별 규칙을 계정에 저장할 수 있습니다.';
+    return;
+  }
+
+  const name = $('#customRuleSite').value.trim();
+  if (!name) {
+    $('#ruleMessage').textContent = '사이트 이름을 입력해 주세요.';
+    return;
+  }
+
+  const data = await api('/api/password/rules', {
+    method: 'POST',
+    body: JSON.stringify({
+      name,
+      minLength: Number($('#customRuleMin').value),
+      maxLength: $('#customRuleMax').value ? Number($('#customRuleMax').value) : null,
+      allowedSpecials: $('#customRuleSpecials').value,
+      requireUppercase: $('#customRuleUpper').checked,
+      requireLowercase: $('#customRuleLower').checked,
+      requireNumber: $('#customRuleNumber').checked,
+      requireSpecial: $('#customRuleSpecial').checked
+    })
+  });
+
+  $('#ruleMessage').textContent = data.message;
+  await loadRules();
+  $('#generatorSiteSearch').value = name;
+  $('#analysisSiteSearch').value = name;
+  applyGeneratorRule();
+  renderRule();
+}
+
+async function loadRules() {
   state.rules = await api('/api/password/rules');
   populateSites();
+}
+
+async function refreshAccountData() {
+  await loadRules();
+  await loadCategories();
+  await loadHints();
+}
+
+async function init() {
+  await loadRules();
   renderAuth();
+  await loadCategories();
   analyzeCurrentPassword();
   loadHints();
-  const initialTool = window.location.hash.replace('#', '');
-  if (toolIds.includes(initialTool)) {
-    history.replaceState({ tool: initialTool }, '', `#${initialTool}`);
-    showTool(initialTool, false);
-  } else {
-    history.replaceState({ tool: null }, '', '#home');
-    showTool(null, false);
-  }
+  history.replaceState({ tool: null }, '', '#home');
+  showTool(null, false);
 }
 
 $('#openLogin').addEventListener('click', () => openAuth('login'));
@@ -388,16 +502,19 @@ $('#closeAuth').addEventListener('click', () => $('#authDialog').close());
 $('#authForm').addEventListener('submit', submitAuth);
 $('#logoutButton').addEventListener('click', clearAuth);
 $('#passwordInput').addEventListener('input', analyzeCurrentPassword);
-$('#analysisSite').addEventListener('change', () => {
+$('#analysisSiteSearch').addEventListener('input', () => {
   renderRule();
   analyzeCurrentPassword();
 });
-$('#generatorSite').addEventListener('change', applyGeneratorRule);
+$('#generatorSiteSearch').addEventListener('input', applyGeneratorRule);
 $('#generateButton').addEventListener('click', generatePassword);
 $('#copyButton').addEventListener('click', copyGeneratedPassword);
 $('#saveHintButton').addEventListener('click', saveHint);
 $('#hintSearch').addEventListener('input', loadHints);
+$('#hintCategoryFilter').addEventListener('change', loadHints);
 $('#hintList').addEventListener('click', handleHintAction);
+$('#addCategoryButton').addEventListener('click', addCategory);
+$('#saveRuleButton').addEventListener('click', saveCustomRule);
 document.addEventListener('click', handleNavigation);
 window.addEventListener('popstate', () => {
   const tool = window.location.hash.replace('#', '');

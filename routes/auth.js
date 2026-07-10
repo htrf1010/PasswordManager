@@ -20,8 +20,8 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ message: '아이디와 비밀번호를 모두 입력해 주세요.' });
   }
 
-  if (username.length < 3) {
-    return res.status(400).json({ message: '아이디는 3자 이상이어야 합니다.' });
+  if (!/^[A-Za-z0-9_]{3,20}$/.test(username)) {
+    return res.status(400).json({ message: '아이디는 영문, 숫자, 밑줄만 사용해서 3~20자로 입력해 주세요.' });
   }
 
   if (password.length < 8) {

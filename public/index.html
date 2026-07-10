@@ -16,10 +16,10 @@
           <circle cx="24" cy="34" r="2"></circle>
         </svg>
       </a>
-      <nav class="main-nav">
-        <a href="#analyzer">비밀번호 강도 분석기</a>
-        <a href="#hints">힌트 메모장</a>
-        <a href="#generator">랜덤 비밀번호 생성기</a>
+      <nav class="main-nav" aria-label="주요 기능">
+        <a data-nav="analyzer" href="#analyzer">비밀번호 강도 분석기</a>
+        <a data-nav="hints" href="#hints">힌트 메모장</a>
+        <a data-nav="generator" href="#generator">랜덤 비밀번호 생성기</a>
       </nav>
       <nav class="top-actions">
         <span id="userBadge" class="user-badge hidden"></span>
@@ -69,9 +69,9 @@
             <p class="eyebrow">Analyzer</p>
             <h2>비밀번호 강도 분석기</h2>
           </div>
-          <label>사이트</label>
-          <select id="analysisSite"></select>
-          <label>비밀번호</label>
+          <label for="analysisSiteSearch">사이트 검색</label>
+          <input id="analysisSiteSearch" list="siteOptions" type="search" placeholder="예: Google, github.com">
+          <label for="passwordInput">비밀번호</label>
           <input id="passwordInput" type="password" placeholder="분석할 비밀번호 입력">
           <div class="meter">
             <span id="meterFill"></span>
@@ -86,10 +86,11 @@
         <div class="panel">
           <div class="panel-title">
             <p class="eyebrow">Rules</p>
-            <h2>사이트 규칙 및 분석 결과</h2>
+            <h2>사이트 규칙 및 분석 근거</h2>
           </div>
           <div id="ruleBox" class="rule-box"></div>
-          <div id="adviceBox" class="advice-box">비밀번호를 입력하면 규칙 기반 분석이 표시됩니다.</div>
+          <div id="riskBox" class="risk-box">비밀번호를 입력하면 추정 위험도를 표시합니다.</div>
+          <div id="adviceBox" class="advice-box">규칙 기반 분석 결과가 여기에 표시됩니다.</div>
         </div>
       </section>
 
@@ -99,11 +100,16 @@
             <p class="eyebrow">Generator</p>
             <h2>랜덤 비밀번호 생성기</h2>
           </div>
-          <label>사이트</label>
-          <select id="generatorSite"></select>
+          <label for="generatorSiteSearch">사이트 검색</label>
+          <input id="generatorSiteSearch" list="siteOptions" type="search" placeholder="예: Google, github.com">
           <div id="generatorRuleBox" class="rule-box compact-rule"></div>
-          <label>길이</label>
+
+          <label for="lengthInput">길이</label>
           <input id="lengthInput" type="number" min="8" max="64" value="16">
+          <label for="requiredCharsInput">반드시 넣고 싶은 문자</label>
+          <input id="requiredCharsInput" type="text" placeholder="예: 7, @, 내 이니셜">
+          <label for="extraCharsInput">생성 후보에 추가할 문자</label>
+          <input id="extraCharsInput" type="text" placeholder="예: -_.!">
           <div class="toggle-grid">
             <label><input id="upperOption" type="checkbox" checked> 대문자</label>
             <label><input id="lowerOption" type="checkbox" checked> 소문자</label>
@@ -112,8 +118,28 @@
           </div>
           <button id="generateButton" class="primary-button full">생성</button>
         </div>
+
         <div class="panel result-panel">
           <div class="panel-title">
+            <p class="eyebrow">Custom Rule</p>
+            <h2>사이트별 규칙 등록</h2>
+          </div>
+          <div class="rule-form">
+            <input id="customRuleSite" type="text" placeholder="사이트 이름">
+            <input id="customRuleMin" type="number" min="4" max="128" value="8" aria-label="최소 길이">
+            <input id="customRuleMax" type="number" min="4" max="128" placeholder="최대 길이">
+            <input id="customRuleSpecials" type="text" placeholder="허용 특수문자 예: !@#$">
+            <div class="toggle-grid compact">
+              <label><input id="customRuleUpper" type="checkbox"> 대문자 필수</label>
+              <label><input id="customRuleLower" type="checkbox"> 소문자 필수</label>
+              <label><input id="customRuleNumber" type="checkbox"> 숫자 필수</label>
+              <label><input id="customRuleSpecial" type="checkbox"> 특수문자 필수</label>
+            </div>
+            <button id="saveRuleButton" class="ghost-button full">내 규칙 저장</button>
+            <p id="ruleMessage" class="muted"></p>
+          </div>
+
+          <div class="panel-title output-title">
             <p class="eyebrow">Result</p>
             <h2>생성 결과</h2>
           </div>
@@ -129,19 +155,16 @@
             <p class="eyebrow">Encrypted Memo</p>
             <h2>나만의 비밀번호 힌트 메모장</h2>
           </div>
-          <label>사이트</label>
+          <label for="hintSite">사이트</label>
           <input id="hintSite" type="text" placeholder="예: Google">
-          <label>카테고리</label>
-          <select id="hintCategory">
-            <option>금융</option>
-            <option>SNS</option>
-            <option>게임</option>
-            <option>학교</option>
-            <option>회사</option>
-            <option selected>기타</option>
-          </select>
-          <label>힌트</label>
-          <textarea id="hintText" rows="5" placeholder="비밀번호가 아니라 나만 알 수 있는 힌트만 저장하세요."></textarea>
+          <label for="hintCategory">카테고리</label>
+          <div class="inline-row">
+            <select id="hintCategory"></select>
+            <button id="addCategoryButton" class="small-button" type="button">추가</button>
+          </div>
+          <input id="newCategoryInput" class="hidden" type="text" placeholder="새 카테고리 이름">
+          <label for="hintText">힌트</label>
+          <textarea id="hintText" rows="5" placeholder="비밀번호가 아닌, 본인만 알아볼 수 있는 힌트만 저장하세요."></textarea>
           <button id="saveHintButton" class="primary-button full">암호화 저장</button>
           <p id="hintMessage" class="muted"></p>
         </div>
@@ -151,10 +174,13 @@
             <h2>저장된 힌트</h2>
           </div>
           <input id="hintSearch" type="search" placeholder="사이트 검색">
+          <select id="hintCategoryFilter" aria-label="카테고리 필터"></select>
           <div id="hintList" class="hint-list"></div>
         </div>
       </section>
     </main>
+
+    <datalist id="siteOptions"></datalist>
 
     <dialog id="authDialog">
       <form id="authForm" method="dialog" class="auth-form">
