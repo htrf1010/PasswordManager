@@ -49,7 +49,15 @@ function all(sql, params = []) {
 }
 
 function handleSupabaseResult(result) {
-  if (result.error) throw result.error;
+  if (result.error) {
+    const message = result.error.message || result.error.error_description || JSON.stringify(result.error);
+    const error = new Error(message);
+    error.status = result.status;
+    error.details = result.error.details;
+    error.hint = result.error.hint;
+    error.code = result.error.code;
+    throw error;
+  }
   return result.data;
 }
 

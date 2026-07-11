@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const baseRules = require('../public/password-rules.json');
 const { listUserRules, saveUserRule } = require('../database/db');
 const { requireAuth } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/asyncHandler');
 
 const router = express.Router();
 
@@ -201,11 +202,11 @@ function generatePassword(options = {}, rules = baseRules) {
   return shuffle(password.slice(0, length));
 }
 
-router.get('/rules', optionalAuth, async (req, res) => {
+router.get('/rules', optionalAuth, asyncHandler(async (req, res) => {
   res.json(await getRulesForRequest(req));
-});
+}));
 
-router.post('/rules', requireAuth, async (req, res) => {
+router.post('/rules', requireAuth, asyncHandler(async (req, res) => {
   const siteName = String(req.body.name || req.body.site || '').trim();
   if (!siteName) {
     return res.status(400).json({ message: '사이트 이름을 입력해 주세요.' });
@@ -228,18 +229,18 @@ router.post('/rules', requireAuth, async (req, res) => {
     allowedSpecials
   });
 
-  res.status(201).json({ message: '사이트별 비밀번호 규칙이 저장되었습니다.' });
-});
+  return res.status(201).json({ message: '사이트별 비밀번호 규칙이 저장되었습니다.' });
+}));
 
-router.post('/analyze', optionalAuth, async (req, res) => {
+router.post('/analyze', optionalAuth, asyncHandler(async (req, res) => {
   const rules = await getRulesForRequest(req);
   res.json(analyzePassword(req.body.password, req.body.site, rules));
-});
+}));
 
-router.post('/generate', optionalAuth, async (req, res) => {
+router.post('/generate', optionalAuth, asyncHandler(async (req, res) => {
   const rules = await getRulesForRequest(req);
   const password = generatePassword(req.body, rules);
   res.json({ password, analysis: analyzePassword(password, req.body.site, rules) });
-});
+}));
 
 module.exports = router;

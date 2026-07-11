@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createUser, findUserByUsername } = require('../database/db');
+const { asyncHandler } = require('../middleware/asyncHandler');
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ function createToken(user) {
   );
 }
 
-router.post('/register', async (req, res) => {
+router.post('/register', asyncHandler(async (req, res) => {
   const { username, password, confirmPassword } = req.body;
 
   if (!username || !password || !confirmPassword) {
@@ -41,9 +42,9 @@ router.post('/register', async (req, res) => {
   const user = await createUser(username, passwordHash);
 
   return res.status(201).json({ token: createToken(user), user });
-});
+}));
 
-router.post('/login', async (req, res) => {
+router.post('/login', asyncHandler(async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -64,6 +65,6 @@ router.post('/login', async (req, res) => {
     token: createToken(user),
     user: { id: user.id, username: user.username }
   });
-});
+}));
 
 module.exports = router;
