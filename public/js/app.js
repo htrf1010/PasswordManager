@@ -15,6 +15,14 @@ const state = {
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 const toolIds = ['analyzer', 'generator', 'hints'];
+const statusClasses = ['status-error', 'status-warning', 'status-success'];
+
+function setStatusMessage(selector, message, type = 'success') {
+  const element = typeof selector === 'string' ? $(selector) : selector;
+  element.classList.remove(...statusClasses);
+  if (type) element.classList.add(`status-${type}`);
+  element.textContent = message;
+}
 
 async function api(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
@@ -60,9 +68,11 @@ function openAuth(mode) {
   state.authMode = mode;
   $('#authTitle').textContent = mode === 'login' ? '로그인' : '회원가입';
   $('#authConfirm').classList.toggle('hidden', mode === 'login');
-  $('#authMessage').textContent = mode === 'login'
-    ? '아이디와 비밀번호를 입력해 주세요.'
-    : '아이디는 영문, 숫자, 밑줄 3~20자로 입력해 주세요.';
+  setStatusMessage(
+    '#authMessage',
+    mode === 'login' ? '아이디와 비밀번호를 입력해 주세요.' : '아이디는 영문, 숫자, 밑줄 3~20자로 입력해 주세요.',
+    null
+  );
   $('#authForm').reset();
   $('#authDialog').showModal();
 }
@@ -81,7 +91,7 @@ async function submitAuth(event) {
     setAuth(data.user, data.token);
     $('#authDialog').close();
   } catch (error) {
-    $('#authMessage').textContent = error.message;
+    setStatusMessage('#authMessage', error.message, 'error');
   }
 }
 
@@ -228,6 +238,8 @@ function renderAnalysis(data) {
     .join('');
 
   $('#riskBox').textContent = data.risk?.text || '근거 있는 위험도 정보가 없습니다.';
+  $('#riskBox').classList.toggle('status-error', data.risk?.level === '높음');
+  $('#riskBox').classList.toggle('status-warning', data.risk?.level === '주의');
   $('#adviceBox').innerHTML = `<ul>${data.advice.map((item) => `<li>${item}</li>`).join('')}</ul>`;
 }
 
@@ -284,9 +296,9 @@ async function copyGeneratedPassword() {
   setTimeout(async () => {
     try {
       await navigator.clipboard.writeText('');
-      $('#copyMessage').textContent = '클립보드를 비웠습니다.';
+      setStatusMessage('#copyMessage', '클립보드를 비웠습니다.', 'success');
     } catch {
-      $('#copyMessage').textContent = '브라우저 정책상 클립보드 자동 비우기가 제한되었습니다.';
+      setStatusMessage('#copyMessage', '브라우저 정책상 클립보드 자동 비우기가 제한되었습니다.', 'warning');
     }
   }, 30000);
 }
@@ -315,7 +327,7 @@ async function loadCategories() {
 
 async function addCategory() {
   if (!state.token) {
-    $('#hintMessage').textContent = '로그인해야 카테고리를 저장할 수 있습니다.';
+    setStatusMessage('#hintMessage', '로그인해야 카테고리를 저장할 수 있습니다.', 'error');
     return;
   }
 
@@ -332,7 +344,7 @@ async function addCategory() {
     method: 'POST',
     body: JSON.stringify({ name })
   });
-  $('#hintMessage').textContent = data.message;
+  setStatusMessage('#hintMessage', data.message, 'success');
   input.value = '';
   input.classList.add('hidden');
   await loadCategories();
@@ -341,7 +353,7 @@ async function addCategory() {
 
 async function saveHint() {
   if (!state.token) {
-    $('#hintMessage').textContent = '로그인해야 힌트를 저장할 수 있습니다.';
+    setStatusMessage('#hintMessage', '로그인해야 힌트를 저장할 수 있습니다.', 'error');
     return;
   }
 
@@ -355,7 +367,7 @@ async function saveHint() {
     const path = state.editingHintId ? `/api/hints/${state.editingHintId}` : '/api/hints';
     const method = state.editingHintId ? 'PUT' : 'POST';
     const data = await api(path, { method, body: JSON.stringify(payload) });
-    $('#hintMessage').textContent = data.message;
+    setStatusMessage('#hintMessage', data.message, 'success');
     state.editingHintId = null;
     $('#saveHintButton').textContent = '암호화 저장';
     $('#hintSite').value = '';
@@ -363,7 +375,7 @@ async function saveHint() {
     await loadCategories();
     loadHints();
   } catch (error) {
-    $('#hintMessage').textContent = error.message;
+    setStatusMessage('#hintMessage', error.message, 'error');
   }
 }
 
@@ -407,7 +419,7 @@ async function loadHints() {
     state.hints = hints;
     renderHints(hints);
   } catch (error) {
-    $('#hintList').innerHTML = `<p class="muted">${error.message}</p>`;
+    $('#hintList').innerHTML = `<p class="muted status-error">${error.message}</p>`;
   }
 }
 
@@ -443,36 +455,40 @@ async function handleHintAction(event) {
 
 async function saveCustomRule() {
   if (!state.token) {
-    $('#ruleMessage').textContent = '로그인해야 사이트별 규칙을 계정에 저장할 수 있습니다.';
+    setStatusMessage('#ruleMessage', '로그인해야 사이트별 규칙을 계정에 저장할 수 있습니다.', 'error');
     return;
   }
 
   const name = $('#customRuleSite').value.trim();
   if (!name) {
-    $('#ruleMessage').textContent = '사이트 이름을 입력해 주세요.';
+    setStatusMessage('#ruleMessage', '사이트 이름을 입력해 주세요.', 'error');
     return;
   }
 
-  const data = await api('/api/password/rules', {
-    method: 'POST',
-    body: JSON.stringify({
-      name,
-      minLength: Number($('#customRuleMin').value),
-      maxLength: $('#customRuleMax').value ? Number($('#customRuleMax').value) : null,
-      allowedSpecials: $('#customRuleSpecials').value,
-      requireUppercase: $('#customRuleUpper').checked,
-      requireLowercase: $('#customRuleLower').checked,
-      requireNumber: $('#customRuleNumber').checked,
-      requireSpecial: $('#customRuleSpecial').checked
-    })
-  });
+  try {
+    const data = await api('/api/password/rules', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        minLength: Number($('#customRuleMin').value),
+        maxLength: $('#customRuleMax').value ? Number($('#customRuleMax').value) : null,
+        allowedSpecials: $('#customRuleSpecials').value,
+        requireUppercase: $('#customRuleUpper').checked,
+        requireLowercase: $('#customRuleLower').checked,
+        requireNumber: $('#customRuleNumber').checked,
+        requireSpecial: $('#customRuleSpecial').checked
+      })
+    });
 
-  $('#ruleMessage').textContent = data.message;
-  await loadRules();
-  $('#generatorSiteSearch').value = name;
-  $('#analysisSiteSearch').value = name;
-  applyGeneratorRule();
-  renderRule();
+    setStatusMessage('#ruleMessage', data.message, 'success');
+    await loadRules();
+    $('#generatorSiteSearch').value = name;
+    $('#analysisSiteSearch').value = name;
+    applyGeneratorRule();
+    renderRule();
+  } catch (error) {
+    setStatusMessage('#ruleMessage', error.message, 'error');
+  }
 }
 
 async function loadRules() {
@@ -522,5 +538,5 @@ window.addEventListener('popstate', () => {
 });
 
 init().catch((error) => {
-  document.body.insertAdjacentHTML('afterbegin', `<p class="muted">${error.message}</p>`);
+  document.body.insertAdjacentHTML('afterbegin', `<p class="muted status-error">${error.message}</p>`);
 });
