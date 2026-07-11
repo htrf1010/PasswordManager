@@ -135,11 +135,15 @@ async function initSqliteDatabase() {
 }
 
 async function initSupabaseDatabase() {
-  const result = await supabase.from('users').select('id').limit(1);
-  if (result.error) {
-    throw new Error(
-      `Supabase tables are not ready: ${result.error.message}. Run supabase-schema.sql in the Supabase SQL editor.`
-    );
+  const tables = ['users', 'hints', 'user_categories', 'user_rules'];
+
+  for (const table of tables) {
+    const result = await supabase.from(table).select('*').limit(1);
+    if (result.error) {
+      throw new Error(
+        `Supabase table "${table}" is not ready: ${result.error.message}. Run supabase-schema.sql in the Supabase SQL editor.`
+      );
+    }
   }
 }
 
